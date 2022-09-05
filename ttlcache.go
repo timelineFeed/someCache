@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -8,16 +9,15 @@ import (
 
 type ttlCache struct {
 	cache
-	expire time.Time
+	expire time.Duration
 }
 
 type ttlContent struct {
-	key    string
-	value  any
-	expire time.Time
+	value      any
+	expireTime time.Time
 }
 
-func NewTTLCache(size uint64, expire time.Time) *ttlCache {
+func NewTTLCache(size uint64, expire time.Duration) *ttlCache {
 	return &ttlCache{
 		cache: cache{
 			lock:       sync.Mutex{},
@@ -46,14 +46,34 @@ func (c *ttlCache) SetCache(key string, value any) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.contentMap[key] = &ttlContent{
-		key:    key,
-		value:  value,
-		expire: c.expire,
+		value:      value,
+		expireTime: time.Now().Add(c.expire),
 	}
 	return nil
 }
 
 func (c *ttlCache) handleExpire() {
-	//TODO 借鉴gingame util
+	for {
+		time.Sleep(1 * time.Second)
+		err := c.FindOverDel()
+		if err != nil {
+			fmt.Printf("in handle expire err=%+v", err)
+		}
+	}
 
+}
+
+// FindOverDel 找出超时的key并删除
+func (c *ttlCache) FindOverDel() error {
+
+	for k, v := range c.contentMap {
+		if o, ok := v.(ttlContent); !ok {
+			return errors.New(ErrorAssertFailure)
+		} else {
+			if o.expireTime.Before(time.Now()) {
+				delete(c.contentMap, k)
+			}
+		}
+	}
+	return nil
 }

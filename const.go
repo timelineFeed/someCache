@@ -7,4 +7,5 @@ const (
 	ErrorAssertFailure    = "assert failure"
 	DeFaultExpireTime     = 10 * time.Second
 	DeFaultDeepExpireTime = 24 * time.Hour
+	ErrorReflectFailed    = "reflect failed"
 )
