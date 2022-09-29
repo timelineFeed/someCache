@@ -19,6 +19,8 @@ type doubleTTLCache struct {
 	oldExpire time.Duration
 }
 
+var _ iTTLCache = &doubleTTLCache{}
+
 type doubleContent struct {
 	value      any
 	expireTime time.Time
@@ -42,18 +44,14 @@ func (d *doubleTTLCache) SetCache(key string, value any) error {
 	oKey := fmt.Sprintf(oldKey, key)
 	// 先找一下是否有new key
 	if v, ok := d.contentMap[nKey]; !ok {
-		// 没有new key,那么 new old key都设置为改值
+		// 没有new key,只设置 new key
 		d.contentMap[nKey] = &doubleContent{
 			value:      value,
 			expireTime: time.Now().Add(d.newExpire),
 		}
-		d.contentMap[oKey] = &doubleContent{
-			value:      value,
-			expireTime: time.Now().Add(d.oldExpire),
-		}
 		return nil
 	} else {
-		if content, o := v.(doubleContent); !o {
+		if content, o := v.(*doubleContent); !o {
 			return fmt.Errorf(ErrorAssertFailure)
 		} else {
 			// 将new的值更新到old，用插入的值更新new的
@@ -63,7 +61,7 @@ func (d *doubleTTLCache) SetCache(key string, value any) error {
 			}
 			d.contentMap[nKey] = newContent
 			d.contentMap[oKey] = &doubleContent{
-				value:      content,
+				value:      content.value,
 				expireTime: time.Now().Add(d.oldExpire),
 			}
 			return nil
@@ -82,36 +80,46 @@ func (d *doubleTTLCache) GetCache(key string) (any, error) {
 			return nil, fmt.Errorf(ErrorNotFound)
 		} else {
 			// old key found
-			if value, can := o.(doubleContent); !can {
+			if content, can := o.(*doubleContent); !can {
 				return nil, errors.New(ErrorAssertFailure)
 			} else {
-				return value, nil
+				return content.value, nil
 			}
 		}
 
 	} else {
 		// new key found
-		if value, can := v.(doubleContent); !can {
+		if content, can := v.(*doubleContent); !can {
 			return nil, errors.New(ErrorAssertFailure)
 		} else {
-			return value, nil
+			return content.value, nil
 		}
 	}
+}
+
+func (d *doubleTTLCache) GetCacheExpire(key string) (any, time.Time, error) {
+	cache, err := d.GetCache(key)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	content := cache.(*doubleContent)
+	return content.value, content.expireTime, nil
 }
 
 func (d *doubleTTLCache) handleExpire() {
 	for {
 		time.Sleep(1 * time.Second)
-		err := d.foundExpireDel()
+		err := d.findOverDel()
 		if err != nil {
 			fmt.Printf("in handle expire err=%+v", err)
 		}
 	}
 }
 
-func (d *doubleTTLCache) foundExpireDel() error {
+func (d *doubleTTLCache) findOverDel() error {
 	for k, v := range d.contentMap {
 		if vale, ok := v.(doubleContent); !ok {
+			fmt.Println(ErrorAssertFailure)
 			return errors.New(ErrorAssertFailure)
 		} else {
 			if vale.expireTime.Before(time.Now()) {

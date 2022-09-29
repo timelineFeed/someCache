@@ -10,7 +10,9 @@ type cache struct {
 	contentMap map[string]any
 }
 
-func NewCache(size int) *cache {
+var _ iCache = &cache{}
+
+func NewCache() *cache {
 	return &cache{
 		lock:       sync.Mutex{},
 		contentMap: make(map[string]any),

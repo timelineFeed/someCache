@@ -17,7 +17,9 @@ type ttlContent struct {
 	expireTime time.Time
 }
 
-func NewTTLCache(size uint64, expire time.Duration) *ttlCache {
+var _ iTTLCache = &ttlCache{}
+
+func NewTTLCache(expire time.Duration) *ttlCache {
 	return &ttlCache{
 		cache: cache{
 			lock:       sync.Mutex{},
@@ -33,7 +35,7 @@ func (c *ttlCache) GetCache(key string) (any, error) {
 	if value, ok := c.contentMap[key]; !ok {
 		return nil, fmt.Errorf(ErrorNotFound)
 	} else {
-		if v, o := value.(ttlContent); !o {
+		if v, o := value.(*ttlContent); !o {
 			return nil, fmt.Errorf(ErrorAssertFailure)
 		} else {
 			return v.value, nil
@@ -55,7 +57,7 @@ func (c *ttlCache) SetCache(key string, value any) error {
 func (c *ttlCache) handleExpire() {
 	for {
 		time.Sleep(1 * time.Second)
-		err := c.FindOverDel()
+		err := c.findOverDel()
 		if err != nil {
 			fmt.Printf("in handle expire err=%+v", err)
 		}
@@ -64,10 +66,10 @@ func (c *ttlCache) handleExpire() {
 }
 
 // FindOverDel 找出超时的key并删除
-func (c *ttlCache) FindOverDel() error {
+func (c *ttlCache) findOverDel() error {
 
 	for k, v := range c.contentMap {
-		if o, ok := v.(ttlContent); !ok {
+		if o, ok := v.(*ttlContent); !ok {
 			return errors.New(ErrorAssertFailure)
 		} else {
 			if o.expireTime.Before(time.Now()) {
