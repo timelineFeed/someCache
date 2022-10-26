@@ -1,6 +1,8 @@
 package cache
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func Init(model int) (iCache, error) {
 	switch model {
@@ -17,4 +19,5 @@ func Init(model int) (iCache, error) {
 	default:
 		return nil, fmt.Errorf(ErrorUnknownCache)
 	}
+	
 }
